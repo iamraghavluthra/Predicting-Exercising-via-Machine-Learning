@@ -1,0 +1,101 @@
+---
+title: "Prediciting the type of exercise"
+author: "Raghav Luthra"
+date: "10 September 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Synopsis
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. In this report, I have used data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. I would like to thank Groupware @ LEs for letting me use their dataset. The experimentation echnique and the dataset, can be found on their [website](http://groupware.les.inf.puc-rio.br/har). 
+
+Also, this would have not been possible with our mentor, Mr. Greski, whose articles helped us perform Parallel Processing in R.
+
+## Pre processing and Loading data
+
+``` {r pre }
+
+library(caret)
+library(parallel)
+library(doParallel)
+
+training <- read.csv("pml-training.csv")
+
+testing <- read.csv("pml-testing.csv")
+
+```
+
+## Removing unnecessary variables
+
+After having a quick look into the testing and training data, I observed that many of the variables were NA throughout the dataset. So, I removed them all with columns containing values of **kurtosis, skewness, avg, max, min, var, stddev and amplitude**
+
+``` {r vars }
+
+b <- names(testing)
+
+cols <- grep("kurtosis|skewness|avg|max|min|var|stddev|amplitude",b)
+
+train_ok <- training[,-cols]
+```
+
+Next, it was obvious that X, timestamp, number of window or new window will be of any help in predicting if the user did the exercise correctly ot not. So, I removed them also.
+
+```{r pre-2}
+
+train1_new <-train_ok[,c(2,8:60)]
+
+```
+
+## Partioning the data
+
+I have reserved 30% of the training data to be reserved for cross validation for myself and building the model on other 70%.
+
+``` {r partition}
+inTrain <- createDataPartition(train1_new$classe,p=0.7,list=F)
+
+train1 <- train1_new[inTrain,]
+
+crossValid <- train1_new[-inTrain,]
+```
+
+## Creating the algorithm
+
+Firstly, I have devoted 3 cores out of 4 to R for faster computations.
+
+``` {r use}
+cluster <- makeCluster(detectCores() - 1)
+
+registerDoParallel(cluster)
+```
+
+## Creating the model
+
+Hiding the algorithm due to Coursera guidelines.
+
+```{r algo,echo=F,cache=T,message=F,warning=F}
+
+trainC <- trainControl(method = "cv" , number=2 ,allowParallel = T)
+
+fit_rf <- train(classe ~ . , data = train1,method="rf" ,trControl = trainC)
+
+pr <- predict(fit_rf,crossValid)
+
+```
+
+However, the confusion matrix is as follows : 
+
+``` {r confusion}
+
+confusionMatrix(pr,crossValid$classe)
+
+```
+
+```{r stop}
+
+stopCluster(cluster)
+
+```
